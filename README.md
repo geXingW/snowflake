@@ -15,7 +15,6 @@
 ```yaml
 # application.yml        
 snowflake:
-    timestamp-bits: 41
     data-center-id-bits: 5
     machine-id-bits: 4
     sequence-bits: 12
@@ -75,7 +74,6 @@ class SnowflakeTests {
 ```yml
 # application.yml 
 snowflake:
-    timestamp-bits: 41
     data-center-id-bits: 1
     machine-id-bits: 3
     sequence-bits: 4
@@ -95,3 +93,11 @@ snowflake:
 56680906842025
 56680906842026
 ```
+
+## 鸣谢
+许多地方是参考两位大佬的代码：
+
+1. [分布式高效ID生产黑科技]: https://gitee.com/yu120/sequence
+2. [mybatis-plus]: https://github.com/baomidou/mybatis-plus
+
+大佬辛苦了！
