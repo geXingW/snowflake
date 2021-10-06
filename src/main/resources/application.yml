@@ -1,0 +1,8 @@
+snowflake:
+  timestamp-bits: 41
+  data-center-id-bits: 1
+  machine-id-bits: 7
+  sequence-bits: 11
+  data-center-id: 1
+  machine-id: 13
+  allow-time-backward-m-s: 6
