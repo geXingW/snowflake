@@ -5,4 +5,4 @@ snowflake:
   sequence-bits: 11
   data-center-id: 1
   machine-id: 13
-  allow-time-backward-m-s: 6
+  allow-time-backward-ms: 6

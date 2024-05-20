@@ -44,7 +44,7 @@ public class Snowflake {
      * <p>
      * 自定义配置文件配置：snowflake.timestamp-bits
      */
-    private long timestampBits = 41L;
+    private final long timestampBits = 41L;
 
     /**
      * 数据中心ID标识码
@@ -149,27 +149,18 @@ public class Snowflake {
      * <p>
      * 自定义配置文件配置：snowflake.allow-time-backward-m-s
      */
-    private long allowTimeBackwardMS = 5L;
+    private long allowTimeBackwardMs = 5L;
+
+    private static Snowflake snowflake = new Snowflake();
+
+    static {
+        snowflake = new Snowflake();
+    }
 
     public Snowflake() {
-        if(this.dataCenterId == 0L) {
-            this.dataCenterId = this.getDataCenterId(this.maxDataCenterId);
-        }
-
-        if(this.machineId == 0L){
-            this.machineId = this.getMachineId(this.maxMachineId);
-        }
     }
 
     public Snowflake(long startTimestamp) {
-        if(this.dataCenterId == 0L) {
-            this.dataCenterId = this.getDataCenterId(this.maxDataCenterId);
-        }
-
-        if(this.machineId == 0L){
-            this.machineId = this.getMachineId(this.maxMachineId);
-        }
-
         this.startTimestamp = startTimestamp;
     }
 
@@ -178,23 +169,27 @@ public class Snowflake {
         this.machineId = machineId;
     }
 
-    public Snowflake(long startTimestamp, long dataCenterId, long machineId, long allowTimeBackwardMS) {
+    public Snowflake(long startTimestamp, long dataCenterId, long machineId, long allowTimeBackwardMs) {
         this.dataCenterId = dataCenterId;
         this.machineId = machineId;
         this.startTimestamp = startTimestamp;
-        this.allowTimeBackwardMS = allowTimeBackwardMS;
+        this.allowTimeBackwardMs = allowTimeBackwardMs;
     }
 
-    public Snowflake(long startTimestamp, long dataCenterId, long machineId, long allowTimeBackwardMS, long dataCenterIdBits, long machineIdBits, long sequenceBits) {
+    public Snowflake(long startTimestamp, long dataCenterId, long machineId, long allowTimeBackwardMs, long dataCenterIdBits, long machineIdBits, long sequenceBits) {
         this.validBitsSum(dataCenterIdBits, machineIdBits, sequenceBits);
 
         this.startTimestamp = startTimestamp;
         this.dataCenterId = dataCenterId;
         this.machineId = machineId;
-        this.allowTimeBackwardMS = allowTimeBackwardMS;
+        this.allowTimeBackwardMs = allowTimeBackwardMs;
         this.dataCenterIdBits = dataCenterIdBits;
         this.machineIdBits = machineIdBits;
         this.sequenceBits = sequenceBits;
+    }
+
+    public static Long getId() {
+        return snowflake.nextId();
     }
 
     /**
@@ -209,8 +204,10 @@ public class Snowflake {
          *     2、重新计算各部分允许的最大值
          */
         if (this.hasCustomBits()) {
-            this.reCalcBitsMax();   // 重新计算各部分从左到右起始位数
-            this.reCalcBitsOffset(); // 重新计算各部分允许的最大值
+            // 重新计算各部分从左到右起始位数
+            this.reCalcBitsMax();
+            // 重新计算各部分允许的最大值
+            this.reCalcBitsOffset();
         }
 
         long currentTimestamp = this.getCurrentTimestamp();
@@ -223,12 +220,14 @@ public class Snowflake {
          */
         if (currentTimestamp < this.lastTimestamp) {
             long timestampOffset = this.lastTimestamp - currentTimestamp;
-            if (timestampOffset > this.allowTimeBackwardMS) {   // 如果时钟回拨范围大于允许的最大回拨范围，抛出异常
+            // 如果时钟回拨范围大于允许的最大回拨范围，抛出异常
+            if (timestampOffset > this.allowTimeBackwardMs) {
                 throw new RuntimeException(String.format("Clock moved backwards.  Refusing to generate id for %d milliseconds", timestampOffset));
             }
 
             try {
-                wait(timestampOffset);  // 如果回拨时间范围 小于 允许的最大回拨范围，程序等待
+                // 如果回拨时间范围 小于 允许的最大回拨范围，程序等待
+                wait(timestampOffset);
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
@@ -256,7 +255,8 @@ public class Snowflake {
             this.lastSequence = ThreadLocalRandom.current().nextLong(0, 3);
         }
 
-        this.lastTimestamp = currentTimestamp; // 记录当前所生成的时间戳，用于下一次生成进行比对
+        // 记录当前所生成的时间戳，用于下一次生成进行比对
+        this.lastTimestamp = currentTimestamp;
 
         return ((currentTimestamp - this.startTimestamp) << this.timestampOffset)
                 | (this.dataCenterId << this.dataCenterIdOffset)
@@ -273,6 +273,7 @@ public class Snowflake {
             return true;
         }
 
+        //noinspection RedundantIfStatement
         if (this.sequenceBits != STANDARD_SEQUENCE_BITS) {
             return true;
         }
@@ -448,6 +449,7 @@ public class Snowflake {
     }
 
     private long calcMaxValueByBits(long bits) {
-        return -1L ^ (-1L << bits);
+        return ~(-1L << bits);
     }
+
 }
