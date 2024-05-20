@@ -1,16 +1,38 @@
 package local.gexingw.snowflake;
 
-import org.springframework.boot.context.properties.ConfigurationProperties;
-import org.springframework.stereotype.Component;
-
 import java.lang.management.ManagementFactory;
 import java.net.InetAddress;
 import java.net.NetworkInterface;
 import java.util.concurrent.ThreadLocalRandom;
 
-@Component
-@ConfigurationProperties(prefix = "snowflake")
+/**
+ * @author GeXingW
+ */
 public class Snowflake {
+
+    /**
+     * 默认：起始时间
+     */
+    private static final long DEFAULT_START_TIMESTAMP = 1380556800000L;
+
+    /**
+     * 默认：允许时间回拨的毫秒数
+     */
+    private static final Long DEFAULT_ALLOW_BACKWARD_MS = 5L;
+
+
+    /**
+     * 总得字符长度
+     */
+    private final static long TOTAL_BITS = 63L;
+
+    /**
+     * 标准的雪花算法各部分所占位数
+     */
+    private final static long DEFAULT_TIMESTAMP_BITS = 41L;
+    private final static long DEFAULT_DATA_CENTER_ID_BITS = 5L;
+    private final static long DEFAULT_MACHINE_ID_BITS = 5L;
+    private final static long DEFAULT_SEQUENCE_BITS = 12L;
 
     /**
      * 起始时间
@@ -21,20 +43,7 @@ public class Snowflake {
      * <p>
      * 配置文件配置：snowflake.start-timestamp
      */
-    private long startTimestamp = 1380556800000L;
-
-    /**
-     * 总得字符长度
-     */
-    private final static long TOTAL_BITS = 63L;
-
-    /**
-     * 标准的雪花算法各部分所占位数
-     */
-    private final static long STANDARD_TIMESTAMP_BITS = 41L;
-    private final static long STANDARD_DATA_CENTER_ID_BITS = 5L;
-    private final static long STANDARD_MACHINE_ID_BITS = 5L;
-    private final static long STANDARD_SEQUENCE_BITS = 12L;
+    private long startTimestamp = DEFAULT_START_TIMESTAMP;
 
     /**
      * 时间戳所占的二进制位数
@@ -44,6 +53,7 @@ public class Snowflake {
      * <p>
      * 自定义配置文件配置：snowflake.timestamp-bits
      */
+    @SuppressWarnings("FieldCanBeLocal")
     private final long timestampBits = 41L;
 
     /**
@@ -74,26 +84,11 @@ public class Snowflake {
      */
     private long sequenceBits = 12L;
 
-
-    /**
-     * 可使用的最大数据中心ID
-     * 设置该值是为了避免传入数据中心ID过大，超出可用位数限制
-     * 数据中心Id可表示范围为 0 ~ 31，大于31就是超出了，程序进行取模处理
-     */
-    private long maxDataCenterId = this.calcMaxValueByBits(this.dataCenterIdBits);
-
-    /**
-     * 可使用的最大机器码ID
-     * 设置该值是为了避免传入机器码过大，超出可用位数限制
-     * 机器码Id可表示范围为 0 ~ 31，大于31就是超出了，程序进行取模处理
-     */
-    private long maxMachineId = this.calcMaxValueByBits(this.machineIdBits);
-
     /**
      * 每毫秒内可共生成的最大序列号
      * 序列号可表示范围为 0 ~ 4095，大于4095程序跳到下一毫秒进行生成
      */
-    private long maxSequence = this.calcMaxValueByBits(this.sequenceBits);
+    private long maxSequence = 4095L;
 
     /**
      * 时间戳在64位结果中从右到左的起始位置
@@ -151,45 +146,73 @@ public class Snowflake {
      */
     private long allowTimeBackwardMs = 5L;
 
-    private static Snowflake snowflake = new Snowflake();
-
-    static {
-        snowflake = new Snowflake();
-    }
-
     public Snowflake() {
+        this(DEFAULT_START_TIMESTAMP, 0L, 0L, DEFAULT_ALLOW_BACKWARD_MS, DEFAULT_DATA_CENTER_ID_BITS, DEFAULT_MACHINE_ID_BITS, DEFAULT_SEQUENCE_BITS);
     }
 
+    /**
+     * 自定义开始时间戳
+     *
+     * @param startTimestamp 生成的开始时间戳
+     */
     public Snowflake(long startTimestamp) {
-        this.startTimestamp = startTimestamp;
+        this(startTimestamp, 0L, 0L, DEFAULT_ALLOW_BACKWARD_MS, DEFAULT_DATA_CENTER_ID_BITS, DEFAULT_MACHINE_ID_BITS, DEFAULT_SEQUENCE_BITS);
     }
 
+    /**
+     * 自定义数据中心Id和机器Id
+     *
+     * @param dataCenterId 数据中心Id
+     * @param machineId    机器Id
+     */
     public Snowflake(long dataCenterId, long machineId) {
-        this.dataCenterId = dataCenterId;
-        this.machineId = machineId;
+        this(DEFAULT_START_TIMESTAMP, dataCenterId, machineId, DEFAULT_ALLOW_BACKWARD_MS, DEFAULT_DATA_CENTER_ID_BITS, DEFAULT_MACHINE_ID_BITS, DEFAULT_SEQUENCE_BITS);
     }
 
+    /**
+     * 自定义开始时间戳、数据中心Id、机器Id、允许回拨的毫秒数
+     *
+     * @param startTimestamp      开始时间戳
+     * @param dataCenterId        数据中心id
+     * @param machineId           机器Id
+     * @param allowTimeBackwardMs 允许回拨的毫秒数
+     */
     public Snowflake(long startTimestamp, long dataCenterId, long machineId, long allowTimeBackwardMs) {
-        this.dataCenterId = dataCenterId;
-        this.machineId = machineId;
-        this.startTimestamp = startTimestamp;
-        this.allowTimeBackwardMs = allowTimeBackwardMs;
+        this(startTimestamp, dataCenterId, machineId, allowTimeBackwardMs, DEFAULT_DATA_CENTER_ID_BITS, DEFAULT_MACHINE_ID_BITS, DEFAULT_SEQUENCE_BITS);
     }
 
+    /**
+     * 自定义开始时间戳、数据中心Id、机器Id、允许回拨的毫秒数、数据中心Id所占位数、机器Id所占位数、序列号所占位数
+     *
+     * @param startTimestamp      开始时间戳
+     * @param dataCenterId        数据中心Id
+     * @param machineId           机器Id
+     * @param allowTimeBackwardMs 允许回拨的毫秒数
+     * @param dataCenterIdBits    数据中心Id位数
+     * @param machineIdBits       机器Id位数
+     * @param sequenceBits        序列号位数
+     */
     public Snowflake(long startTimestamp, long dataCenterId, long machineId, long allowTimeBackwardMs, long dataCenterIdBits, long machineIdBits, long sequenceBits) {
+        // 校验设置的位数是否正确
         this.validBitsSum(dataCenterIdBits, machineIdBits, sequenceBits);
-
+        // 序列号生成的开始时间
         this.startTimestamp = startTimestamp;
-        this.dataCenterId = dataCenterId;
-        this.machineId = machineId;
+        // 如果数据中心Id为0，自动计算一个
+        this.dataCenterId = dataCenterId == 0L ? getDataCenterId(~(-1L << dataCenterIdBits)) : dataCenterId;
+        // 如果机器Id为0，自动计算一个
+        this.machineId = machineId == 0L ? getMachineId(~(-1L << machineIdBits)) : machineId;
         this.allowTimeBackwardMs = allowTimeBackwardMs;
         this.dataCenterIdBits = dataCenterIdBits;
         this.machineIdBits = machineIdBits;
         this.sequenceBits = sequenceBits;
-    }
-
-    public static Long getId() {
-        return snowflake.nextId();
+        // 最大序列号
+        this.maxSequence = ~(-1L << sequenceBits);
+        // 时间戳偏移位数
+        this.timestampOffset = this.dataCenterIdBits + this.machineIdBits + this.sequenceBits;
+        // 数据中心Id偏移位数
+        this.dataCenterIdOffset = this.machineIdBits + this.sequenceBits;
+        // 机器标识码偏移位数
+        this.machineIdOffset = this.sequenceBits;
     }
 
     /**
@@ -198,26 +221,12 @@ public class Snowflake {
      * @return snowflakeId
      */
     public synchronized long nextId() {
-        /**
-         * 如果各部分所占位数进行了自定义：
-         *     1、重新计算各部分从左到右起始位数
-         *     2、重新计算各部分允许的最大值
-         */
-        if (this.hasCustomBits()) {
-            // 重新计算各部分从左到右起始位数
-            this.reCalcBitsMax();
-            // 重新计算各部分允许的最大值
-            this.reCalcBitsOffset();
-        }
-
+        // 当前时间
         long currentTimestamp = this.getCurrentTimestamp();
 
-        /**
-         * 如果当前时间小于上次生成的时间，可能发生的时钟回拨情况
-         *
-         * 1、如果回拨时间范围 小于 允许的最大回拨范围，程序等待
-         * 2、如果回拨时间范围 大于 允许的最大回拨范围，抛出异常
-         */
+        // 如果当前时间小于上次生成的时间，可能发生的时钟回拨情况
+        // 1、如果回拨时间范围 小于 允许的最大回拨范围，程序等待
+        // 2、如果回拨时间范围 大于 允许的最大回拨范围，抛出异常
         if (currentTimestamp < this.lastTimestamp) {
             long timestampOffset = this.lastTimestamp - currentTimestamp;
             // 如果时钟回拨范围大于允许的最大回拨范围，抛出异常
@@ -232,23 +241,23 @@ public class Snowflake {
                 throw new RuntimeException(e);
             }
 
-            /**
-             * 等待结束，即认定为可以继续生成Id
-             * 重新获取用于生成最终结果的 时间戳
-             */
+            // 等待结束，即认定为可以继续生成Id
+            // 重新获取用于生成最终结果的 时间戳
             currentTimestamp = this.getCurrentTimestamp();
         }
 
+        // 当前序列号
         this.lastSequence = (this.lastSequence + 1) & maxSequence;
 
-        /**
-         * this.lastSequence 为 0，代表当前时间戳已经达到 序列号最大值(maxSequence)，分两种情况处理：
-         *  1、如果 当前时间戳 与 所记录的上次生成时间戳 相同，则当前时间戳跳到下一毫秒，并将序列号重新置为起始状态
-         *  2、如果 当前时间戳 大于 所记录的上次生成时间戳，则直接将当前时间戳跳到下一毫秒，并将序列号重新置为起始状态
-         *  3、当前时间戳 小于 所记录的上次生成时间戳 的情况即为 时钟回拨的情况，按时钟回拨已进行处理，不在考虑
-         */
+        /*
+         this.lastSequence 为 0，代表当前时间戳已经达到 序列号最大值(maxSequence)，分两种情况处理：
+          1、如果 当前时间戳 与 所记录的上次生成时间戳 相同，则当前时间戳跳到下一毫秒，并将序列号重新置为起始状态
+          2、如果 当前时间戳 大于 所记录的上次生成时间戳，则直接将当前时间戳跳到下一毫秒，并将序列号重新置为起始状态
+          3、当前时间戳 小于 所记录的上次生成时间戳 的情况即为 时钟回拨的情况，按时钟回拨已进行处理，不在考虑
+        */
         if (this.lastSequence == 0L) {
-            if (currentTimestamp == this.lastTimestamp) { // 相同时间戳改为下一个时间戳
+            // 相同时间戳改为下一个时间戳
+            if (currentTimestamp == this.lastTimestamp) {
                 currentTimestamp = this.getNextTimestamp(this.lastTimestamp);
             }
 
@@ -262,23 +271,6 @@ public class Snowflake {
                 | (this.dataCenterId << this.dataCenterIdOffset)
                 | (this.machineId << this.machineIdOffset)
                 | this.lastSequence;
-    }
-
-    private boolean hasCustomBits() {
-        if (this.dataCenterIdOffset != STANDARD_DATA_CENTER_ID_BITS) {
-            return true;
-        }
-
-        if (this.machineIdOffset != STANDARD_MACHINE_ID_BITS) {
-            return true;
-        }
-
-        //noinspection RedundantIfStatement
-        if (this.sequenceBits != STANDARD_SEQUENCE_BITS) {
-            return true;
-        }
-
-        return false;
     }
 
     public void setStartTimestamp(long startTimestamp) {
@@ -301,15 +293,14 @@ public class Snowflake {
      * 抄自：
      * 项目：mybatis-plus
      * 源代码包名：om.baomidou.mybatisplus.core.toolkit.Sequence;
-     * 地址：https://github.com/baomidou/mybatis-plus
+     * 地址：<a href="https://github.com/baomidou/mybatis-plus">Sequence</a>
      * <p>
      * 如果没有手动设定 数据中心Id，程序为保证正常运行，自动计算一个数据中心Id，
      * 计算出的结果是根据最大数据中心Id取模后的，不会超出数据中心Id的标识范围
      *
-     * @param maxDataCenterId
-     * @return
+     * @return 数据中心Id
      */
-    protected long getDataCenterId(long maxDataCenterId) {
+    private static long getDataCenterId(long maxDataCenterId) {
         long id = 0L;
         try {
             InetAddress ip = InetAddress.getLocalHost();
@@ -335,9 +326,9 @@ public class Snowflake {
      * 抄自：
      * 项目：mybatis-plus
      * 源代码包名：com.baomidou.mybatisplus.core.toolkit.Sequence;
-     * 地址：https://github.com/baomidou/mybatis-plus
+     * 地址：<a href="https://github.com/baomidou/mybatis-plus">Sequence</a>
      */
-    protected long getMachineId(long maxMachineId) {
+    private long getMachineId(long maxMachineId) {
         StringBuilder mPid = new StringBuilder();
         mPid.append(dataCenterId);
         String name = ManagementFactory.getRuntimeMXBean().getName();
@@ -357,7 +348,7 @@ public class Snowflake {
      * 抄自：
      * 项目：mybatis-plus
      * 源代码包名：com.baomidou.mybatisplus.core.toolkit.StringUtils;
-     * 地址：https://github.com/baomidou/mybatis-plus
+     * 地址：<a href="https://github.com/baomidou/mybatis-plus">StringUtils</a>
      */
     private boolean isBlank(CharSequence cs) {
         if (cs != null) {
@@ -375,8 +366,8 @@ public class Snowflake {
     /**
      * 获取比当前毫秒时间戳大的下一个毫秒时间戳
      *
-     * @param currentTimestamp
-     * @return
+     * @param currentTimestamp 当前的毫秒时间戳
+     * @return 下一个毫秒时间戳
      */
     private long getNextTimestamp(long currentTimestamp) {
         long nextTimestamp = getCurrentTimestamp();
@@ -391,7 +382,7 @@ public class Snowflake {
     /**
      * 获取当前毫秒级时间戳
      *
-     * @return
+     * @return 当前的毫秒时间戳
      */
     private long getCurrentTimestamp() {
         return System.currentTimeMillis();
@@ -401,55 +392,14 @@ public class Snowflake {
      * 校验自定义的各项字符位数，是否符合雪花算法组成要求：
      * 总数之和可以小于或等于 63位，但不能大于63位
      *
-     * @param dataCenterIdBits
-     * @param machineIdBits
-     * @param sequenceBits
+     * @param dataCenterIdBits 数据中心Id位数
+     * @param machineIdBits    机器Id位数
+     * @param sequenceBits     序列号位数
      */
     private void validBitsSum(long dataCenterIdBits, long machineIdBits, long sequenceBits) {
-        if (this.TOTAL_BITS < this.timestampBits + dataCenterIdBits + machineIdBits + sequenceBits) {
-            throw new RuntimeException(String.format("The sum of bits should not over %d", this.TOTAL_BITS));
+        if (TOTAL_BITS < this.timestampBits + dataCenterIdBits + machineIdBits + sequenceBits) {
+            throw new RuntimeException(String.format("The sum of bits should not over %d", TOTAL_BITS));
         }
-    }
-
-    /**
-     * 验证当前设定的 数据中心Id 和 机器标识Id 是否超过各自最大值
-     *
-     * @param dataCenterId
-     * @param machineId
-     */
-    private void validDataCenterIdAndMachineId(long dataCenterId, long machineId) {
-        if (dataCenterId > this.maxDataCenterId) {
-            throw new RuntimeException(String.format("Data center Id can't be greater than %d or less than 0!", this.maxDataCenterId));
-        }
-
-        if (machineId > this.maxMachineId) {
-            throw new RuntimeException(String.format("Machine Id can't be greater than %d or less than 0!", this.maxMachineId));
-        }
-    }
-
-    /**
-     * 重新各部分从左到右的起始位数
-     */
-    private void reCalcBitsOffset() {
-        this.timestampOffset = this.dataCenterIdBits + this.machineIdBits + this.sequenceBits;
-        this.dataCenterIdOffset = this.machineIdBits + this.sequenceBits;
-        this.machineIdOffset = this.sequenceBits;
-    }
-
-    /**
-     * 重新计算各部分的最大值
-     */
-    private void reCalcBitsMax() {
-        this.maxDataCenterId = this.calcMaxValueByBits(this.dataCenterIdBits);
-        this.maxMachineId = this.calcMaxValueByBits(this.machineIdBits);
-        this.maxSequence = this.calcMaxValueByBits(this.sequenceBits);
-
-        // 验证当前设定的 数据中心Id 和 机器标识Id 是否超过各自最大值
-        this.validDataCenterIdAndMachineId(this.dataCenterId, this.machineId);
-    }
-
-    private long calcMaxValueByBits(long bits) {
-        return ~(-1L << bits);
     }
 
 }

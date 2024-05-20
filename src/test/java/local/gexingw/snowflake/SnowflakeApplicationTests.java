@@ -7,9 +7,6 @@ import org.springframework.boot.test.context.SpringBootTest;
 @SpringBootTest
 class SnowflakeApplicationTests {
 
-    @Autowired
-    Snowflake snowflake;
-
     private final int testCount = 10;
 
     @Test
@@ -17,17 +14,9 @@ class SnowflakeApplicationTests {
     }
 
     @Test
-    void testSnowflakeAutowired(){
-        System.out.println("自动注入生成：");
-        for (int i = 0; i < testCount; i++) {
-            System.out.println(snowflake.nextId());
-        }
-    }
-
-    @Test
     void testSnowflakeWithOutParams() {
         Snowflake snowflake = new Snowflake();
-        System.out.println("不指定参数生成：");
+        System.out.println("默认参数生成：");
         for (int i = 0; i < testCount; i++) {
             System.out.println(snowflake.nextId());
         }
@@ -45,16 +34,10 @@ class SnowflakeApplicationTests {
     @Test
     void testSnowflakeWithCustomBits() {
         System.out.println("自定义字符长度：");
-        Snowflake snowflake = new Snowflake(1412092800000L, 1L, 2L, 5L,1L, 3L, 4L);
+        Snowflake snowflake = new Snowflake(1412092800000L, 1L, 2L, 5L, 1L, 3L, 4L);
         for (int i = 0; i < testCount; i++) {
             System.out.println(snowflake.nextId());
         }
     }
 
-    @Test
-    public void testStatic(){
-        for (int i = 0; i < 20; i++) {
-            System.out.println(Snowflake.getId());
-        }
-    }
 }
